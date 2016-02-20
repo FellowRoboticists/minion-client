@@ -1,0 +1,19 @@
+{
+  "name": "minion-client",
+  "version": "1.0.0",
+  "description": "The client code to receive commands to move the robot around.",
+  "main": "index.js",
+  "scripts": {
+    "test": "tape tape/**/*-test.js"
+  },
+  "keywords": [
+    "robot",
+    "irobot",
+    "client"
+  ],
+  "author": "Naive Roboticist",
+  "license": "MIT",
+  "dependencies": {
+    "jsonwebtoken": "^5.7.0"
+  }
+}
