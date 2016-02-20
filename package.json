@@ -4,7 +4,8 @@
   "description": "The client code to receive commands to move the robot around.",
   "main": "index.js",
   "scripts": {
-    "test": "tape tape/**/*-test.js"
+    "start": "node ./index.js",
+    "test": "tape tape/**/*-test.js | faucet"
   },
   "repository": {
     "type": "git",
