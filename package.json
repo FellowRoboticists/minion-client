@@ -6,6 +6,10 @@
   "scripts": {
     "test": "tape tape/**/*-test.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FellowRoboticists/minion-client"
+  },
   "keywords": [
     "robot",
     "irobot",
