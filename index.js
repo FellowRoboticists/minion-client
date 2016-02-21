@@ -56,4 +56,23 @@ iRobotCreate.on('ready', function() {
 
 });
 
+const bumpHandler = function(bumperEvt) {
+  var r = this;
+  console.log("Inside the bump handler");
+
+  // Temporarily disable further bump events. Getting
+  // multiple bump events while one is in progress will
+  // cause weird interleaving of our root behavior.
+  r.off('bump');
+
+  // Back up a bit
+  r.drive(-100, 0);
+  r.wait(1000);
+  r.drive(0, 0); // Stop..
+
+  r.on('bump', bumpHandler);
+};
+
 // TODO: Add other robot event here (like the bump handler)
+iRobotCreate.on('bump', bumpHandler);
+
