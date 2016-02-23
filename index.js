@@ -73,6 +73,25 @@ const bumpHandler = function(bumperEvt) {
   r.on('bump', bumpHandler);
 };
 
+const proximityHandler = function(proximityEvt) {
+  var r = this;
+  
+  console.log("Inside the proximity handler");
+
+  // Temporarily disable further bump events. Getting
+  // multiple bump events while one is in progress will
+  // cause weird interleaving of our root behavior.
+  r.off('proximity');
+
+  // Back up a bit
+  r.drive(-100, 0);
+  r.wait(1000);
+  r.drive(0, 0); // Stop..
+
+  r.on('proximity', proximityHandler);
+};
+
 // TODO: Add other robot event here (like the bump handler)
 iRobotCreate.on('bump', bumpHandler);
+iRobotCreate.on('proximity', proximityHandler);
 
