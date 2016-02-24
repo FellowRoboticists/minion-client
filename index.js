@@ -49,9 +49,14 @@ iRobotCreate.on('ready', function() {
 
   queueSVC.connect('talker', beanstalk.host, beanstalk.port).
     then( () => {
+      console.log("Connected to Talker");
       // Tell the server we're ready to go
-      var token = signer.sign({ name: robotCFG.name, message: 'ready' });
-      queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token);
+      return signer.sign({ name: robotCFG.name, message: 'ready' }).
+        then( (token) => {
+          queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) 
+        });
+    }).
+    then( () => {
     });
 
 });
@@ -64,6 +69,9 @@ const bumpHandler = function(bumperEvt) {
   // multiple bump events while one is in progress will
   // cause weird interleaving of our root behavior.
   r.off('bump');
+
+  signer.sign({ name: robotCFG.name, message: 'bump' }).
+    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
 
   // Back up a bit
   r.drive(-100, 0);
@@ -82,6 +90,9 @@ const proximityHandler = function(proximityEvt) {
   // multiple bump events while one is in progress will
   // cause weird interleaving of our root behavior.
   r.off('proximity');
+
+  signer.sign({ name: robotCFG.name, message: 'proximity' }).
+    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
 
   // Back up a bit
   r.drive(-100, 0);
