@@ -91,7 +91,7 @@ const proximityHandler = function(proximityEvt) {
   // cause weird interleaving of our root behavior.
   r.off('proximity');
 
-  signer.sign({ name: robotCFG.name, message: 'proximity' }).
+  signer.sign({ name: robotCFG.name, message: 'proximity', value: proximityEvt }).
     then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
 
   // Back up a bit
