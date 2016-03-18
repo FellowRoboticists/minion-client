@@ -7,59 +7,108 @@
 
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
-const queueSVC = require('./lib/queue-service');
+const queueSVC = require('robot-queue-service');
 const signer = require('./lib/signer');
 const beanstalk = require('./config/beanstalk');
 const secrets = require('./config/secrets');
 const robotCFG = require('./config/robot');
 const RobotWorker = require('./lib/robot-worker');
-const iRobotCreate = require('create-oi');
+const RobotSerialInterface = require('robot-serial-iface').RobotSerialInterface;
+var program = require('commander')
 
-//const respond = (robotName, command) => {
-  //var payload = {
-    //name: command
-  //};
+program.
+  version('1.0.0').
+  option('-a,--arduino', 'Arduino robot').
+  option('-b,--baudrate [rate]', 'Baud rate [9600]', 9600).
+  option('-c,--create', 'iRobot Create Robot').
+  option('-s,--serialport [port]', 'Serial port [/dev/ttyUSB0]', '/dev/ttyUSB0').
+  parse(process.argv);
 
-  //return __getPrivateKey().
-    //then( (key) => {
-      //var token = jwt.sign(payload, key, { algorithm: 'RS512' });
+const ARDUINO_SENSORS = [
+  {
+    name: 'temperature',
+    startByte: 0x03,
+    numBytes: 2
+  },
+  {
+    name: 'humidity',
+    startByte: 0x02,
+    numBytes: 2,
+    // Only emit the humidity event if the humidity
+    // is greater than 20
+    meetsThreshold: (value) => value < 40
+  }
+];
 
-      //return queueSVC.queueJob('talker', robotName, 100, 0, 300, token);
-    //});
-//};
+const CREATE_SENSORS = [
+  {
+    name: 'bump',
+    startByte: 0x07,
+    numBytes: 1
+  },
+  {
+    name: 'proximity',
+    startByte: 0x21,
+    numBytes: 2
+  }
+];
 
-iRobotCreate.init({ serialport: robotCFG.serialport });
+var sensors = null;
+if (program.arduino) {
+  sensors = ARDUINO_SENSORS;
+}
 
-iRobotCreate.on('ready', function() {
+if (program.create) {
+  sensors = CREATE_SENSORS;
+}
+if (!sensors) {
+  console.error("You must specify the robot type!");
+  process.exit(1);
+}
 
-  // Start up the beanstalk queuing
-  queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port).
-    then( () => {
-      fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
-        if (err) { 
-          console.error("Error reading file: %j", err);
-          process.exit(1);
-        }
-        var worker = new RobotWorker(robotCFG.name, key, iRobotCreate);
-        console.log("Starting to listen on %sCommand", worker.robotName);
-        queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker).
-          then( () => console.log("--") );
-        });
-    });
+var robot = new RobotSerialInterface();
+// Start the interface...
+robot.start(program.serialport, { baudrate: program.baudrate }, sensors);
 
-  queueSVC.connect('talker', beanstalk.host, beanstalk.port).
-    then( () => {
-      console.log("Connected to Talker");
-      // Tell the server we're ready to go
-      return signer.sign({ name: robotCFG.name, message: 'ready' }).
-        then( (token) => {
-          queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) 
-        });
-    }).
-    then( () => {
-    });
 
-});
+// Start up the beanstalk queuing
+queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port).
+  then( () => {
+    fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
+      if (err) { 
+        console.error("Error reading file: %j", err);
+        process.exit(1);
+      }
+      var worker = new RobotWorker(robotCFG.name, key, robot);
+      console.log("Starting to listen on %sCommand", worker.robotName);
+      queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker).
+        then( () => console.log("--") );
+      });
+  });
+
+queueSVC.connect('talker', beanstalk.host, beanstalk.port).
+  then( () => {
+    console.log("Connected to Talker");
+    // Tell the server we're ready to go
+    return signer.sign({ name: robotCFG.name, message: 'ready' }).
+      then( (token) => {
+        queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) 
+      });
+  }).
+  then( () => {
+  });
+
+const temperatureHandler = function(temp) {
+  console.log("Temperature: %d", temp);
+  signer.sign({ name: robotCFG.name, message: 'temperature', value: temp }).
+    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
+};
+
+const humidityHandler = function(humidity) {
+  console.log("Humidity: %d", humidity);
+  signer.sign({ name: robotCFG.name, message: 'humidity', value: humidity }).
+    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
+};
 
 const bumpHandler = function(bumperEvt) {
   var r = this;
@@ -103,6 +152,12 @@ const proximityHandler = function(proximityEvt) {
 };
 
 // TODO: Add other robot event here (like the bump handler)
-iRobotCreate.on('bump', bumpHandler);
-iRobotCreate.on('proximity', proximityHandler);
+if (program.create) {
+  robot.on('bump', bumpHandler);
+  robot.on('proximity', proximityHandler);
+}
+if (program.arduino) {
+  robot.on('temperature', temperatureHandler);
+  robot.on('humidity', humidityHandler);
+}
 

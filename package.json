@@ -19,6 +19,9 @@
   "author": "Naive Roboticist",
   "license": "MIT",
   "dependencies": {
-    "jsonwebtoken": "^5.7.0"
+    "commander": "^2.9.0",
+    "jsonwebtoken": "^5.7.0",
+    "robot-queue-service": "^1.0.0",
+    "robot-serial-iface": "^1.0.0"
   }
 }

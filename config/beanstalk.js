@@ -1,7 +1,7 @@
 module.exports = (() => {
 
   var mod = {
-    host: 'localhost',
+    host: 'blomqvist',
     port: 11300
   };
 
