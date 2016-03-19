@@ -19,10 +19,20 @@ var program = require('commander')
 program.
   version('1.0.0').
   option('-a,--arduino', 'Arduino robot').
+  option('-r,--robot', 'The real robot').
   option('-b,--baudrate [rate]', 'Baud rate [9600]', 9600).
   option('-c,--create', 'iRobot Create Robot').
   option('-s,--serialport [port]', 'Serial port [/dev/ttyUSB0]', '/dev/ttyUSB0').
   parse(process.argv);
+
+const ROBOT_SENSORS = [
+  {
+    name: 'proximity',
+    startByte: 0x01,
+    numBytes: 2,
+    meetsThreshold: (value) => true
+  }
+];
 
 const ARDUINO_SENSORS = [
   {
@@ -56,6 +66,10 @@ const CREATE_SENSORS = [
 var sensors = null;
 if (program.arduino) {
   sensors = ARDUINO_SENSORS;
+}
+
+if (program.robot) {
+  sensors = ROBOT_SENSORS;
 }
 
 if (program.create) {
@@ -159,5 +173,10 @@ if (program.create) {
 if (program.arduino) {
   robot.on('temperature', temperatureHandler);
   robot.on('humidity', humidityHandler);
+}
+if (program.robot) {
+  robot.on('proximity', function(value) {
+    console.log("Proximity: %j", value);
+  });
 }
 
