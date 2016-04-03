@@ -6,7 +6,6 @@
  */
 
 const fs = require('fs');
-const jwt = require('jsonwebtoken');
 const queueSVC = require('robot-queue-service');
 const signer = require('./lib/signer');
 const beanstalk = require('./config/beanstalk');
@@ -19,70 +18,36 @@ var program = require('commander')
 program.
   version('1.0.0').
   option('-a,--arduino', 'Arduino robot').
+  option('-c,--create', 'iRobot Create Robot').
   option('-r,--robot', 'The real robot').
   option('-b,--baudrate [rate]', 'Baud rate [9600]', 9600).
-  option('-c,--create', 'iRobot Create Robot').
   option('-s,--serialport [port]', 'Serial port [/dev/ttyUSB0]', '/dev/ttyUSB0').
   parse(process.argv);
 
-const ROBOT_SENSORS = [
-  {
-    name: 'proximity',
-    startByte: 0x01,
-    numBytes: 2,
-    meetsThreshold: (value) => true
-  }
-];
 
-const ARDUINO_SENSORS = [
-  {
-    name: 'temperature',
-    startByte: 0x03,
-    numBytes: 2
-  },
-  {
-    name: 'humidity',
-    startByte: 0x02,
-    numBytes: 2,
-    // Only emit the humidity event if the humidity
-    // is greater than 20
-    meetsThreshold: (value) => value < 40
-  }
-];
 
-const CREATE_SENSORS = [
-  {
-    name: 'bump',
-    startByte: 0x07,
-    numBytes: 1
-  },
-  {
-    name: 'proximity',
-    startByte: 0x21,
-    numBytes: 2
-  }
-];
-
-var sensors = null;
+var initializer = null;
 if (program.arduino) {
-  sensors = ARDUINO_SENSORS;
+  initializer = require('./lib/arduino-initializer');
 }
 
 if (program.robot) {
-  sensors = ROBOT_SENSORS;
+  initializer = require('./lib/robot-initializer');
 }
 
 if (program.create) {
-  sensors = CREATE_SENSORS;
+  initializer = require('./lib/create-initializer');
 }
-if (!sensors) {
+
+if (!initializer) {
   console.error("You must specify the robot type!");
   process.exit(1);
 }
 
 var robot = new RobotSerialInterface();
+
 // Start the interface...
-robot.start(program.serialport, { baudrate: program.baudrate }, sensors);
+robot.start(program.serialport, { baudrate: program.baudrate }, initializer.sensors, initializer.initializer);
 
 
 // Start up the beanstalk queuing
@@ -112,71 +77,12 @@ queueSVC.connect('talker', beanstalk.host, beanstalk.port).
   then( () => {
   });
 
-const temperatureHandler = function(temp) {
-  console.log("Temperature: %d", temp);
-  signer.sign({ name: robotCFG.name, message: 'temperature', value: temp }).
+robot.on('ready', function() {
+  console.log("The robot is ready for motivation");
+  // Report back to the server this very interesting event...
+  signer.sign({ name: robotCFG.name, message: 'ready', value: 1 }).
     then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
-};
+});
 
-const humidityHandler = function(humidity) {
-  console.log("Humidity: %d", humidity);
-  signer.sign({ name: robotCFG.name, message: 'humidity', value: humidity }).
-    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
-};
-
-const bumpHandler = function(bumperEvt) {
-  var r = this;
-  console.log("Inside the bump handler");
-
-  // Temporarily disable further bump events. Getting
-  // multiple bump events while one is in progress will
-  // cause weird interleaving of our root behavior.
-  r.off('bump');
-
-  signer.sign({ name: robotCFG.name, message: 'bump' }).
-    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
-
-  // Back up a bit
-  r.drive(-100, 0);
-  r.wait(1000);
-  r.drive(0, 0); // Stop..
-
-  r.on('bump', bumpHandler);
-};
-
-const proximityHandler = function(proximityEvt) {
-  var r = this;
-  
-  console.log("Inside the proximity handler");
-
-  // Temporarily disable further bump events. Getting
-  // multiple bump events while one is in progress will
-  // cause weird interleaving of our root behavior.
-  r.off('proximity');
-
-  signer.sign({ name: robotCFG.name, message: 'proximity', value: proximityEvt }).
-    then( (token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token) );
-
-  // Back up a bit
-  r.drive(-100, 0);
-  r.wait(1000);
-  r.drive(0, 0); // Stop..
-
-  r.on('proximity', proximityHandler);
-};
-
-// TODO: Add other robot event here (like the bump handler)
-if (program.create) {
-  robot.on('bump', bumpHandler);
-  robot.on('proximity', proximityHandler);
-}
-if (program.arduino) {
-  robot.on('temperature', temperatureHandler);
-  robot.on('humidity', humidityHandler);
-}
-if (program.robot) {
-  robot.on('proximity', function(value) {
-    console.log("Proximity: %j", value);
-  });
-}
+initializer.registerHandlers(robot);
 
