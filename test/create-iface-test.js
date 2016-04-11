@@ -1,15 +1,19 @@
 const test = require('blue-tape');
-const riface = require('../lib/arduino-initializer');
+const riface = require('../lib/create-initializer');
 
 /**
  * Defines a stub for the RSI.ready() function.
  */
 const RSI = function() {
   var readyCount = 0;
+  var commands = [];
   Object.defineProperties(this, {
     "readyCount": {
       "get": function() { return readyCount },
       "set": function(val) { readyCount = val }
+    },
+    "commands": {
+      "get": function() { return commands }
     }
   });
 };
@@ -18,27 +22,35 @@ RSI.prototype.ready = function() {
   this.readyCount += 1;
 };
 
+RSI.prototype.sendCommand = function(cmd, payload) {
+  this.commands.push({ command: cmd, payload: payload });
+};
+
+RSI.prototype.wait = function(ms) {
+  return new Promise( (resolve, reject) => setTimeout(resolve, ms) );
+};
+
 const Robot = function() {
-  var tempHandler = null;
-  var humidityHandler = null;
+  var bumpHandler = null;
+  var proximityHandler = null;
   Object.defineProperties(this, {
-    "tempHandler": {
-      "get": function() { return tempHandler },
-      "set": function(val) { tempHandler = val }
+    "bumpHandler": {
+      "get": function() { return bumpHandler },
+      "set": function(val) { bumpHandler = val }
     },
-    "humidityHandler": {
-      "get": function() { return humidityHandler },
-      "set": function(val) { humidityHandler = val }
+    "proximityHandler": {
+      "get": function() { return proximityHandler },
+      "set": function(val) { proximityHandler = val }
     }
   });
 };
 
 Robot.prototype.on = function(name, handler) {
-  if (name === 'temperature') {
-    this.tempHandler = handler
+  if (name === 'bump') {
+    this.bumpHandler = handler
   }
-  if (name === 'humidity') {
-    this.humidityHandler = handler;
+  if (name === 'proximity') {
+    this.proximityHandler = handler;
   }
 };
 
@@ -53,8 +65,10 @@ test('there must be an initializer function', (assert) => {
 test('the initializer should invoke the "ready" function', (assert) => {
   var rsi = new RSI();
   riface.initializer(rsi);
-  assert.equal(rsi.readyCount, 1,
-              'ready should have been called exactly once');
+  //assert.equal(rsi.commands.length, 6,
+               //'six commands should have been issued to the robot');
+  //assert.equal(rsi.readyCount, 1,
+              //'ready should have been called exactly once');
   assert.end();
 });
 
@@ -74,26 +88,24 @@ test('there should be two sensors defined', (assert) => {
 
 
   var temp = riface.sensors[0];
-  assert.equal(temp.name, 'temperature',
-               'first sensor should be "temperature"');
-  assert.equal(temp.startByte, 0x03,
-               'first sensor start byte should be "0x03"');
-  assert.equal(temp.numBytes, 2,
-               'first sensor should have two bytes');
+  assert.equal(temp.name, 'bump',
+               'first sensor should be "bump"');
+  assert.equal(temp.startByte, 0x07,
+               'first sensor start byte should be "0x07"');
+  assert.equal(temp.numBytes, 1,
+               'first sensor should have one bytes');
   assert.notOk(temp.meetsThreshold,
                'should be no meets threshold function');
 
   var humidity = riface.sensors[1];
-  assert.equal(humidity.name, 'humidity',
-               'first sensor should be "humidity"');
-  assert.equal(humidity.startByte, 0x02,
-               'first sensor start byte should be "0x02"');
+  assert.equal(humidity.name, 'proximity',
+               'first sensor should be "proximity"');
+  assert.equal(humidity.startByte, 0x21,
+               'first sensor start byte should be "0x21"');
   assert.equal(humidity.numBytes, 2,
                'first sensor should have two bytes');
-  assert.ok(humidity.meetsThreshold,
-            'Should be a meetsThresold function');
-  assert.equal(typeof humidity.meetsThreshold, "function",
-               'meetsThreshold should be a function');
+  assert.notOk(humidity.meetsThreshold,
+            'Should be no meetsThresold function');
 
   assert.end();
 });
@@ -112,15 +124,15 @@ test('should register the actual sensor handlers', (assert) => {
   var robot = new Robot();
   riface.registerHandlers(robot);
 
-  assert.ok(robot.tempHandler,
-            'the temperature handler should have been set');
-  assert.equal(typeof robot.tempHandler, 'function',
-               'the temperature handler should be a function');
+  assert.ok(robot.bumpHandler,
+            'the bump handler should have been set');
+  assert.equal(typeof robot.bumpHandler, 'function',
+               'the bump handler should be a function');
 
-  assert.ok(robot.humidityHandler,
-            'the humidity handler should have been set');
-  assert.equal(typeof robot.humidityHandler, 'function',
-               'the humidity handler should be a function');
+  assert.ok(robot.proximityHandler,
+            'the proximity handler should have been set');
+  assert.equal(typeof robot.proximityHandler, 'function',
+               'the proximity handler should be a function');
 
   assert.end();
 });

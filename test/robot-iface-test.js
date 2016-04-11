@@ -1,5 +1,5 @@
 const test = require('blue-tape');
-const riface = require('../lib/arduino-initializer');
+const riface = require('../lib/robot-initializer');
 
 /**
  * Defines a stub for the RSI.ready() function.
@@ -19,26 +19,18 @@ RSI.prototype.ready = function() {
 };
 
 const Robot = function() {
-  var tempHandler = null;
-  var humidityHandler = null;
+  var proximityHandler = null;
   Object.defineProperties(this, {
-    "tempHandler": {
-      "get": function() { return tempHandler },
-      "set": function(val) { tempHandler = val }
-    },
-    "humidityHandler": {
-      "get": function() { return humidityHandler },
-      "set": function(val) { humidityHandler = val }
+    "proximityHandler": {
+      "get": function() { return proximityHandler },
+      "set": function(val) { proximityHandler = val }
     }
   });
 };
 
 Robot.prototype.on = function(name, handler) {
-  if (name === 'temperature') {
-    this.tempHandler = handler
-  }
-  if (name === 'humidity') {
-    this.humidityHandler = handler;
+  if (name === 'proximity') {
+    this.proximityHandler = handler;
   }
 };
 
@@ -69,31 +61,21 @@ test('there must be a sensors object', (assert) => {
 });
 
 test('there should be two sensors defined', (assert) => {
-  assert.equal(riface.sensors.length, 2,
-               'there should be two sensors defined');
+  assert.equal(riface.sensors.length, 1,
+               'there should be one sensors defined');
 
 
-  var temp = riface.sensors[0];
-  assert.equal(temp.name, 'temperature',
-               'first sensor should be "temperature"');
-  assert.equal(temp.startByte, 0x03,
-               'first sensor start byte should be "0x03"');
-  assert.equal(temp.numBytes, 2,
+  var proximity = riface.sensors[0];
+  assert.equal(proximity.name, 'proximity',
+               'first sensor should be "proximity"');
+  assert.equal(proximity.startByte, 0x01,
+               'first sensor start byte should be "0x01"');
+  assert.equal(proximity.numBytes, 2,
                'first sensor should have two bytes');
-  assert.notOk(temp.meetsThreshold,
-               'should be no meets threshold function');
-
-  var humidity = riface.sensors[1];
-  assert.equal(humidity.name, 'humidity',
-               'first sensor should be "humidity"');
-  assert.equal(humidity.startByte, 0x02,
-               'first sensor start byte should be "0x02"');
-  assert.equal(humidity.numBytes, 2,
-               'first sensor should have two bytes');
-  assert.ok(humidity.meetsThreshold,
+  assert.ok(proximity.meetsThreshold,
             'Should be a meetsThresold function');
-  assert.equal(typeof humidity.meetsThreshold, "function",
-               'meetsThreshold should be a function');
+  assert.equal(typeof proximity.meetsThreshold, 'function',
+               'threshold must be a function');
 
   assert.end();
 });
@@ -112,15 +94,10 @@ test('should register the actual sensor handlers', (assert) => {
   var robot = new Robot();
   riface.registerHandlers(robot);
 
-  assert.ok(robot.tempHandler,
-            'the temperature handler should have been set');
-  assert.equal(typeof robot.tempHandler, 'function',
-               'the temperature handler should be a function');
-
-  assert.ok(robot.humidityHandler,
-            'the humidity handler should have been set');
-  assert.equal(typeof robot.humidityHandler, 'function',
-               'the humidity handler should be a function');
+  assert.ok(robot.proximityHandler,
+            'the proximity handler should have been set');
+  assert.equal(typeof robot.proximityHandler, 'function',
+               'the proximity handler should be a function');
 
   assert.end();
 });
