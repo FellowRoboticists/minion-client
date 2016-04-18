@@ -21,8 +21,8 @@ a variety of command-line options (summarized below):
 
 Three of the command line options are used to identify the type of 'robot'
 we're going to connect to. Specifically, you would specify -a (--arduino) if 
-you were going to test the client against an Arduino test sketch. This has been
-the primary means of testing the client; I have an Arduino test sketch that
+you were going to test the client against an [Arduino test sketch](https://github.com/FellowRoboticists/telepsketch). 
+This has been the primary means of testing the client; I have an Arduino test sketch that
 flashes LEDs based on the commands it is given. The sketch also outputs sensor
 data in the form of temperature and humidity to test data receipt from the
 Arduino.
