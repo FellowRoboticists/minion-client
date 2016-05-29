@@ -1,11 +1,11 @@
-module.exports = (() => {
+'use strict'
 
+module.exports = (function () {
   var mod = {
 
     robotKey: '../Keys/sarah_rsa',
     serverKey: '../Keys/telep_rsa.pub.pem'
-  };
+  }
 
-  return mod;
-
-}());
+  return mod
+}())
