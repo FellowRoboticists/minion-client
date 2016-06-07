@@ -22,7 +22,8 @@
     "commander": "^2.9.0",
     "jsonwebtoken": "^5.7.0",
     "robot-queue-service": "^1.0.0",
-    "robot-serial-iface": "^1.0.0"
+    "robot-serial-iface": "^1.0.0",
+    "winston": "^2.2.0"
   },
   "devDependencies": {
     "blue-tape": "^0.2.0"

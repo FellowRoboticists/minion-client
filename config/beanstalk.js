@@ -1,7 +1,7 @@
 'use strict'
 module.exports = (function () {
   var mod = {
-    host: 'blomqvist',
+    host: 'localhost',
     port: 11300
   }
 
