@@ -24,10 +24,12 @@ program
   .option('-a,--arduino', 'Arduino robot')
   .option('-c,--create', 'iRobot Create Robot')
   .option('-r,--robot', 'The real robot')
-  .option('-b,--baudrate [rate]', 'Baud rate [9600]', 9600)
-  .option('-s,--serialport [port]', 'Serial port [/dev/ttyUSB0]', '/dev/ttyUSB0')
+  .option('-b,--baudrate [rate]', `Baud rate [${robotCFG.baudrate}]`, robotCFG.baudrate)
+  .option('-s,--serialport [port]', `Serial port [${robotCFG.serialport}]`, robotCFG.serialport)
   .option('-n,--none', 'Do not connect to serial port')
   .parse(process.argv)
+
+var worker = null;
 
 var initializer = null
 if (program.arduino) {
@@ -71,7 +73,8 @@ queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port)
       })
     })
     .then((key) => {
-      var worker = new RobotWorker(robotCFG.name, key, robot)
+      worker = new RobotWorker(robotCFG.name, key, robot)
+      if (!program.none) initializer.registerHandlers(robot, worker)
       winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
       return queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker)
         .then(() => winston.log('info', '--'))
@@ -100,10 +103,9 @@ if (!program.none) {
   robot.on('ready', function () {
     winston.log('info', 'The robot is ready for motivation')
     // Report back to the server this very interesting event...
-    signer.sign({ name: robotCFG.name, message: 'ready', value: 1 })
+    signer.sign({ name: robotCFG.name, message: 'connected', value: 1 })
       .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
   })
 }
 
-if (!program.none) initializer.registerHandlers(robot)
 
