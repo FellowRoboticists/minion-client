@@ -26,7 +26,6 @@ program
   .option('-r,--robot', 'The real robot')
   .option('-b,--baudrate [rate]', `Baud rate [${robotCFG.baudrate}]`, robotCFG.baudrate)
   .option('-s,--serialport [port]', `Serial port [${robotCFG.serialport}]`, robotCFG.serialport)
-  .option('-n,--none', 'Do not connect to serial port')
   .parse(process.argv)
 
 var worker = null;
@@ -47,18 +46,14 @@ if (program.create) {
   initializer = require('./lib/create-initializer')
 }
 
-if (!program.none && !initializer) {
+if (!initializer) {
   winston.log('error', 'You must specify the robot type!')
   process.exit(1)
 }
 
 // Start the interface...
-let robot = null;
-if (!program.none) {
-  winston.log('debug', 'Starting the robot serial interface')
-  robot = new RobotSerialInterface()
-  robot.start(program.serialport, { baudrate: program.baudrate }, initializer.sensors, initializer.initializer)
-}
+winston.log('debug', 'Starting the robot serial interface')
+let robot = new RobotSerialInterface()
 
 // Start up the beanstalk queuing
 queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port)
@@ -73,7 +68,10 @@ queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port)
       })
     })
     .then((key) => {
-      worker = new RobotWorker(robotCFG.name, key, robot)
+      worker = new RobotWorker(robotCFG.name, key, robot, { 
+                              serialport: program.serialport,
+                              baudrate: program.baudrate,
+                              initializer: initializer })
       if (!program.none) initializer.registerHandlers(robot, worker)
       winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
       return queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker)
@@ -99,13 +97,11 @@ queueSVC.connect('talker', beanstalk.host, beanstalk.port)
     process.exit()
   })
 
-if (!program.none) {
-  robot.on('ready', function () {
-    winston.log('info', 'The robot is ready for motivation')
-    // Report back to the server this very interesting event...
-    signer.sign({ name: robotCFG.name, message: 'connected', value: 1 })
-      .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
-  })
-}
+robot.on('ready', function () {
+  winston.log('info', 'The robot is ready for motivation')
+  // Report back to the server this very interesting event...
+  signer.sign({ name: robotCFG.name, message: 'connected', value: 1 })
+    .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
+})
 
 
