@@ -28,7 +28,7 @@ program
   .option('-s,--serialport [port]', `Serial port [${robotCFG.serialport}]`, robotCFG.serialport)
   .parse(process.argv)
 
-var worker = null;
+var worker = null
 
 var initializer = null
 if (program.arduino) {
@@ -55,47 +55,56 @@ if (!initializer) {
 winston.log('debug', 'Starting the robot serial interface')
 let robot = new RobotSerialInterface()
 
-// Start up the beanstalk queuing
-queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port)
-  .then(() => {
-    return new Promise((resolve, reject) => {
-      fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
-        if (err) {
-          winston.log('error', 'Error reading file: %j', err)
-          return reject(err)
-        }
-        resolve(key)
+const handleIncomingCommandsConnect = (reconnectCount = 0) => {
+  // Start up the beanstalk queuing
+  queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port, handleIncomingCommandsConnect, reconnectCount)
+    .then(() => {
+      return new Promise((resolve, reject) => {
+        fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
+          if (err) {
+            winston.log('error', 'Error reading file: %j', err)
+            return reject(err)
+          }
+          resolve(key)
+        })
+      })
+      .then((key) => {
+        worker = new RobotWorker(
+          robotCFG.name, key, robot, {
+            serialport: program.serialport,
+            baudrate: program.baudrate,
+            initializer: initializer })
+        if (!program.none) initializer.registerHandlers(robot, worker)
+        winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
+        return queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker)
+          .then(() => winston.log('info', '--'))
       })
     })
-    .then((key) => {
-      worker = new RobotWorker(robotCFG.name, key, robot, { 
-                              serialport: program.serialport,
-                              baudrate: program.baudrate,
-                              initializer: initializer })
-      if (!program.none) initializer.registerHandlers(robot, worker)
-      winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
-      return queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker)
-        .then(() => winston.log('info', '--'))
+    .catch((err) => {
+      winston.log('error', 'Error connecting to incomingCommands: %j', err)
+      process.exit()
     })
-  })
-  .catch((err) => {
-    winston.log('error', 'Error connecting to incomingCommands: %j', err)
-    process.exit()
-  })
+}
 
-queueSVC.connect('talker', beanstalk.host, beanstalk.port)
-  .then(() => {
-    winston.log('info', 'Connected to Talker')
-    // Tell the server we're ready to go
-    return signer.sign({ name: robotCFG.name, message: 'ready' })
-      .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
-  })
-  .then(() => {
-  })
-  .catch((err) => {
-    winston.log('error', 'Error connecting to talker: %j', err)
-    process.exit()
-  })
+handleIncomingCommandsConnect()
+
+const handleTalkerConnect = (reconnectCount = 0) => {
+  queueSVC.connect('talker', beanstalk.host, beanstalk.port, handleTalkerConnect, reconnectCount)
+    .then(() => {
+      winston.log('info', 'Connected to Talker')
+      // Tell the server we're ready to go
+      return signer.sign({ name: robotCFG.name, message: 'ready' })
+        .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
+    })
+    .then(() => {
+    })
+    .catch((err) => {
+      winston.log('error', 'Error connecting to talker: %j', err)
+      process.exit()
+    })
+}
+
+handleTalkerConnect()
 
 robot.on('ready', function () {
   winston.log('info', 'The robot is ready for motivation')
@@ -103,5 +112,4 @@ robot.on('ready', function () {
   signer.sign({ name: robotCFG.name, message: 'connected', value: 1 })
     .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
 })
-
 
