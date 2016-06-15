@@ -58,7 +58,11 @@ let robot = new RobotSerialInterface()
 const handleIncomingCommandsConnect = (reconnectCount = 0) => {
   // Start up the beanstalk queuing
   queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port, handleIncomingCommandsConnect, reconnectCount)
-    .then(() => {
+    .then((client) => {
+      if (!client) {
+        winston.log('debug', 'No client connected for incomingCommands; skipping')
+        return
+      }
       return new Promise((resolve, reject) => {
         fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
           if (err) {
@@ -90,7 +94,11 @@ handleIncomingCommandsConnect()
 
 const handleTalkerConnect = (reconnectCount = 0) => {
   queueSVC.connect('talker', beanstalk.host, beanstalk.port, handleTalkerConnect, reconnectCount)
-    .then(() => {
+    .then((client) => {
+      if (!client) {
+        winston.log('debug', 'No client connected for talker; skipping')
+        return
+      }
       winston.log('info', 'Connected to Talker')
       // Tell the server we're ready to go
       return signer.sign({ name: robotCFG.name, message: 'ready' })
