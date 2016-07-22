@@ -9,7 +9,7 @@
 const fs = require('fs')
 const queueSVC = require('robot-queue-service')
 const signer = require('./lib/signer')
-const beanstalk = require('./config/beanstalk')
+const rabbit = require('./config/rabbit')
 const secrets = require('./config/secrets')
 const robotCFG = require('./config/robot')
 const RobotWorker = require('./lib/robot-worker')
@@ -56,68 +56,56 @@ winston.log('debug', 'Starting the robot serial interface')
 let robot = new RobotSerialInterface()
 
 const handleIncomingCommandsConnect = (reconnectCount = 0) => {
-  // Start up the beanstalk queuing
-  queueSVC.connect('incomingCommands', beanstalk.host, beanstalk.port, handleIncomingCommandsConnect, reconnectCount)
-    .then((client) => {
-      if (!client) {
-        winston.log('debug', 'No client connected for incomingCommands; skipping')
-        return
-      }
-      return new Promise((resolve, reject) => {
-        fs.readFile(secrets.serverKey, 'utf8', (err, key) => {
-          if (err) {
-            winston.log('error', 'Error reading file: %j', err)
-            return reject(err)
-          }
-          resolve(key)
+  return queueSVC.connect(rabbit.url, rabbit.options)
+    .then((conn) => {
+      winston.log('info', 'Established connection to %s', rabbit.url)
+      return queueSVC.createChannel('talker')
+        .then((ch) => {
+          winston.log('info', 'talker channel established')
         })
-      })
-      .then((key) => {
-        worker = new RobotWorker(
-          robotCFG.name, key, robot, {
-            serialport: program.serialport,
-            baudrate: program.baudrate,
-            initializer: initializer })
-        if (!program.none) initializer.registerHandlers(robot, worker)
-        winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
-        return queueSVC.processRobotJobsInTube('incomingCommands', worker.robotName + 'Command', worker)
-          .then(() => winston.log('info', '--'))
-      })
+        .catch((err) => {
+          winston.log('error', 'Talker error: %j', err)
+          throw err
+        })
     })
-    .catch((err) => {
-      winston.log('error', 'Error connecting to incomingCommands: %j', err)
-      process.exit()
+    .then(() => {
+      return queueSVC.createChannel('listener')
+        .then((ch) => {
+          winston.log('info', 'listener channel established')
+        })
+    })
+    .then(() => {
+      let key = fs.readFileSync(secrets.serverKey)
+      worker = new RobotWorker(
+        robotCFG.name, key, robot, {
+          serialport: program.serialport,
+          baudrate: program.baudrate,
+          initializer: initializer })
+      if (!program.none) initializer.registerHandlers(robot, worker)
+      winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
+      return queueSVC.consume('listener', worker.robotName + 'Command', worker)
+    })
+    .then(() => {
+      // Tell the server we're ready to go
+      return signer.sign({ name: robotCFG.name, message: 'ready' })
+        .then((token) => queueSVC.sendToQueue('talker', robotCFG.name, new Buffer(token)))
     })
 }
 
 handleIncomingCommandsConnect()
-
-const handleTalkerConnect = (reconnectCount = 0) => {
-  queueSVC.connect('talker', beanstalk.host, beanstalk.port, handleTalkerConnect, reconnectCount)
-    .then((client) => {
-      if (!client) {
-        winston.log('debug', 'No client connected for talker; skipping')
-        return
-      }
-      winston.log('info', 'Connected to Talker')
-      // Tell the server we're ready to go
-      return signer.sign({ name: robotCFG.name, message: 'ready' })
-        .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
-    })
-    .then(() => {
-    })
-    .catch((err) => {
-      winston.log('error', 'Error connecting to talker: %j', err)
-      process.exit()
-    })
-}
-
-handleTalkerConnect()
+  .catch((err) => {
+    if (err instanceof Error) {
+      console.error(err.stack)
+    } else {
+      console.error('Error: %j', err)
+    }
+    process.exit()
+  })
 
 robot.on('ready', function () {
   winston.log('info', 'The robot is ready for motivation')
   // Report back to the server this very interesting event...
   signer.sign({ name: robotCFG.name, message: 'connected', value: 1 })
-    .then((token) => queueSVC.queueJob('talker', robotCFG.name, 100, 0, 300, token))
+    .then((token) => queueSVC.sendToQueue('talker', robotCFG.name, new Buffer(token)))
 })
 
