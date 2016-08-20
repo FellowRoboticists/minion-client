@@ -30,14 +30,17 @@ module.exports = (function () {
      * C:\> mmc devmgmt.msc
      *
      */
+    serialport: process.env.SERIAL_PORT,
     // serialport: '/dev/ttyAMA0',
     // This value works from the RaspberryPi to the iRobot Create
-    serialport: '/dev/ttyUSB0',
+    // serialport: '/dev/ttyUSB0',
 
     /**
      * The default baudrate for the iRobot Create is 57600
      */
-    baudrate: 57600
+    baudrate: process.env.BAUD_RATE
+    // baudrate: 19200
+    // baudrate: 57600
 
   }
 
