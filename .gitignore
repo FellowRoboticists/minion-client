@@ -3,3 +3,8 @@
 
 # NPM
 node_modules
+
+# Deployment artifacts
+deploy/repo
+deploy/source
+deploy/packages
