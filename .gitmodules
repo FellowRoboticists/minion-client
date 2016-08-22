@@ -1,0 +1,3 @@
+[submodule "deploy/deploy-support-tools"]
+	path = deploy/deploy-support-tools
+	url = git@github.com:j0hnds/deploy-support-tools.git
