@@ -1,0 +1,79 @@
+#!/bin/bash
+#
+# Use this script to package up the minion-client application and
+# deploy it to the client machine.
+
+DEPLOY_DIR=$(cd $(dirname $0) && pwd)
+
+. ${DEPLOY_DIR}/deploy-support-tools/git-support.sh
+. ${DEPLOY_DIR}/deploy-support-tools/package-support.sh
+. ${DEPLOY_DIR}/deploy-support-tools/remote-support.sh
+
+verbose_level=3
+BRANCH=master
+REPO_DIR=${DEPLOY_DIR}/repo
+SOURCE_DIR=${DEPLOY_DIR}/source
+PACKAGE_DIR=${DEPLOY_DIR}/packages
+RELEASES_DIR=/var/www/minion/releases
+REPOSITORY=git@github.com:FellowRoboticists/minion-client.git
+NAME=minion-client
+MACHINE=agriman.local
+
+usage() {
+  cat <<EOF
+  usage $0 options
+
+  This script packages up minion-client and deploys it to the server.
+
+  OPTIONS:
+    -b branch  the git branch to deploy (default 'master')
+    -h         Display this help message
+    -m machine the machine to deploy to (defalt 'agriman.local')
+    -v         Verbose output
+EOF
+}
+
+# Parse the command line
+while getopts :b:hv OPTION
+do
+  case $OPTION in
+    b)
+      BRANCH=${OPTARG}
+      ;;
+    h)
+      usage
+      exit 1
+      ;;
+    m)
+      MACHINE=${OPTARG}
+      ;;
+    v)
+      verbose_level=4
+      ;;
+    ?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+shift "$(($OPTIND-1))"
+
+ACTION=${1:-create}
+
+# Main program
+debug "BRANCH  = ${BRANCH}"
+debug "ACTION  = ${ACTION}"
+debug "MACHINE = ${MACHINE}"
+
+packageName=${NAME}-${BRANCH}.tar.bz2
+
+prepareSource ${REPO_DIR} ${SOURCE_DIR} ${REPOSITORY} ${NAME} ${BRANCH}
+
+createReleasePackage ${SOURCE_DIR} ${NAME} ${PACKAGE_DIR} ${packageName}
+
+if [ "${ACTION}" == copy ]
+then
+  releaseDir=$(releaseDirectory ${RELEASES_DIR})
+  copyReleasePackage ${PACKAGE_DIR} ${packageName} ${MACHINE} ${releaseDir}
+fi
