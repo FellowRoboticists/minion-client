@@ -14,7 +14,9 @@ BRANCH=master
 REPO_DIR=${DEPLOY_DIR}/repo
 SOURCE_DIR=${DEPLOY_DIR}/source
 PACKAGE_DIR=${DEPLOY_DIR}/packages
-RELEASES_DIR=/var/www/minion/releases
+BASE_DIR=/var/www/minion
+RELEASES_DIR=${BASE_DIR}/releases
+CURRENT_DIR=${BASE_DIR}/current
 REPOSITORY=git@github.com:FellowRoboticists/minion-client.git
 NAME=minion-client
 MACHINE=agriman.local
@@ -31,6 +33,14 @@ usage() {
     -m machine the machine to deploy to (defalt 'agriman.local')
     -v         Verbose output
 EOF
+}
+
+createPackage() {
+  local packageName=$1
+
+  prepareSource ${REPO_DIR} ${SOURCE_DIR} ${REPOSITORY} ${NAME} ${BRANCH}
+
+  createReleasePackage ${SOURCE_DIR} ${NAME} ${PACKAGE_DIR} ${packageName}
 }
 
 # Parse the command line
@@ -68,12 +78,27 @@ debug "MACHINE = ${MACHINE}"
 
 packageName=${NAME}-${BRANCH}.tar.bz2
 
-prepareSource ${REPO_DIR} ${SOURCE_DIR} ${REPOSITORY} ${NAME} ${BRANCH}
-
-createReleasePackage ${SOURCE_DIR} ${NAME} ${PACKAGE_DIR} ${packageName}
+if [ "${ACTION}" == create ]
+then
+  createPackage ${packageName}
+fi
 
 if [ "${ACTION}" == copy ]
 then
+  if [ ! -f "${PACKAGE_DIR}/${packageName}" ]
+  then
+    createPackage ${packageName}
+  fi
+
   releaseDir=$(releaseDirectory ${RELEASES_DIR})
   copyReleasePackage ${PACKAGE_DIR} ${packageName} ${MACHINE} ${releaseDir}
+fi
+
+if [ "${ACTION}" == deploy ]
+then
+  startCommandCapture
+  queueCommand latestDir="\$(ls -t ${RELEASES_DIR} | tail -1)"
+  queueCommand rm -f ${CURRENT_DIR}
+  queueCommand cd ${BASE_DIR} \&\& ln -s releases/\${latestDir} current
+  invokeQueuedCommands ${MACHINE}
 fi
