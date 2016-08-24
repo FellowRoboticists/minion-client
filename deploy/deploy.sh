@@ -102,7 +102,7 @@ then
   queueCommand cd ${BASE_DIR} \&\& ln -s releases/\${latestDir} current
   queueCommand sudo systemctl restart minion
   queueCommand numDirs=\$(ls ${RELEASES_DIR} | wc -l)
-  queueCommand if [ \$numDirs -gt 5 ]; then numDel=\$((numDirs-5)); cd ${RELEASES_DIR} && ls -t | tail -\${numDel} | xargs rm -f; fi
+  queueCommand if [ \$numDirs -gt 5 ]; then numDel=\$((numDirs-5)); cd ${RELEASES_DIR} \&\& ls -t | tail -\${numDel} | xargs rm -f; fi
   invokeQueuedCommands ${MACHINE}
   clearQueuedCommands
 fi
