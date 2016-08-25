@@ -8,6 +8,7 @@ DEPLOY_DIR=$(cd $(dirname $0) && pwd)
 . ${DEPLOY_DIR}/deploy-support-tools/git-support.sh
 . ${DEPLOY_DIR}/deploy-support-tools/package-support.sh
 . ${DEPLOY_DIR}/deploy-support-tools/remote-support.sh
+. ${DEPLOY_DIR}/deploy-support-tools/node-support.sh
 
 verbose_level=3
 BRANCH=master
@@ -19,6 +20,7 @@ RELEASES_DIR=${BASE_DIR}/releases
 CURRENT_DIR=${BASE_DIR}/current
 REPOSITORY=git@github.com:FellowRoboticists/minion-client.git
 NAME=minion-client
+NODE_VERSION=v6.1.0
 MACHINE=agriman.local
 
 usage() {
@@ -31,6 +33,7 @@ usage() {
     -b branch  the git branch to deploy (default 'master')
     -h         Display this help message
     -m machine the machine to deploy to (defalt 'agriman.local')
+    -n version the version of node to use (default 'v6.1.0')
     -v         Verbose output
 EOF
 }
@@ -40,11 +43,13 @@ createPackage() {
 
   prepareSource ${REPO_DIR} ${SOURCE_DIR} ${REPOSITORY} ${NAME} ${BRANCH}
 
+  prepareNodeModules ${SOURCE_DIR} ${NAME} ${NODE_VERSION}
+
   createReleasePackage ${SOURCE_DIR} ${NAME} ${PACKAGE_DIR} ${packageName}
 }
 
 # Parse the command line
-while getopts :b:hv OPTION
+while getopts :b:hm:n:v OPTION
 do
   case $OPTION in
     b)
@@ -56,6 +61,9 @@ do
       ;;
     m)
       MACHINE=${OPTARG}
+      ;;
+    n)
+      NODE_VERSION=${OPTARG}
       ;;
     v)
       verbose_level=4
@@ -72,9 +80,10 @@ shift "$(($OPTIND-1))"
 ACTION=${1:-create}
 
 # Main program
-debug "BRANCH  = ${BRANCH}"
-debug "ACTION  = ${ACTION}"
-debug "MACHINE = ${MACHINE}"
+debug "BRANCH       = ${BRANCH}"
+debug "ACTION       = ${ACTION}"
+debug "MACHINE      = ${MACHINE}"
+debug "NODE_VERSION = ${NODE_VERSION}"
 
 packageName=${NAME}-${BRANCH}.tar.bz2
 
