@@ -106,7 +106,7 @@ fi
 if [ "${ACTION}" == deploy ]
 then
   startCommandCapture
-  queueCommand latestDir="\$(ls -t ${RELEASES_DIR} | tail -1)"
+  queueCommand latestDir="\$(ls -tr ${RELEASES_DIR} | tail -1)"
   queueCommand rm -f ${CURRENT_DIR}
   queueCommand cd ${BASE_DIR} \&\& ln -s releases/\${latestDir} current
   queueCommand sudo systemctl restart minion
