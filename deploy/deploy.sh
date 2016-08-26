@@ -43,7 +43,13 @@ createPackage() {
 
   prepareSource ${REPO_DIR} ${SOURCE_DIR} ${REPOSITORY} ${NAME} ${BRANCH}
 
-  prepareNodeModules ${SOURCE_DIR} ${NAME} ${NODE_VERSION}
+  # Nope; you really can't do this here. The problem is you are
+  # deploying the application to a machine with a completely
+  # different architecture (typically an ARM architecture), so
+  # the NPM modules will likely be unusable (unless you're deploying
+  # from an equivalent architecture).
+  #
+  # prepareNodeModules ${SOURCE_DIR} ${NAME} ${NODE_VERSION}
 
   createReleasePackage ${SOURCE_DIR} ${NAME} ${PACKAGE_DIR} ${packageName}
 }
@@ -87,6 +93,11 @@ debug "NODE_VERSION = ${NODE_VERSION}"
 
 packageName=${NAME}-${BRANCH}.tar.bz2
 
+if [ "${ACTION}" == clear ]
+then
+  rm -f ${PACKAGE_DIR}/${packageName}
+fi
+
 if [ "${ACTION}" == create ]
 then
   createPackage ${packageName}
@@ -101,6 +112,12 @@ then
 
   releaseDir=$(releaseDirectory ${RELEASES_DIR})
   copyReleasePackage ${PACKAGE_DIR} ${packageName} ${MACHINE} ${releaseDir}
+
+  # Unfortunately, we have to install the NPM modules 
+  # from the target machine. This may be significantly 
+  # slower, but given the typical architecture of the target
+  # machine, there really isn't a choice here.
+  invokeRemoteCommand ${MACHINE} cd ${releaseDir} \&\& /usr/local/node/bin/npm install
 fi
 
 if [ "${ACTION}" == deploy ]
@@ -113,5 +130,5 @@ then
   queueCommand numDirs="\$(ls ${RELEASES_DIR} | wc -l)"
   queueCommand "if [ \$numDirs -gt 5 ]; then numDel=\$((numDirs-5)); cd ${RELEASES_DIR} \&\& ls -t | tail -\${numDel} | xargs rm -f; fi"
   invokeQueuedCommands ${MACHINE}
-  # clearQueuedCommands
+  clearQueuedCommands
 fi
