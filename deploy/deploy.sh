@@ -117,7 +117,15 @@ then
   # from the target machine. This may be significantly 
   # slower, but given the typical architecture of the target
   # machine, there really isn't a choice here.
-  invokeRemoteCommand ${MACHINE} cd ${releaseDir} \&\& /usr/local/node/bin/npm install
+  #
+  # OK, so we had all kinds of problems trying to get this to work
+  # and all of it revolved around the fact that there was a 'system'
+  # nodeJs implementation on the target machine and it was picking 
+  # that node rather than the one we wanted. That's why we had to 
+  # set the PATH prior to invoking the command. Once I did that,
+  # it all started to work.
+  #
+  invokeRemoteCommand ${MACHINE} export PATH=/usr/local/node/bin:\$PATH \&\& cd ${releaseDir} \&\& /usr/local/node/bin/npm install
 fi
 
 if [ "${ACTION}" == deploy ]
