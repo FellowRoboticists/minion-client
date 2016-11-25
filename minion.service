@@ -1,0 +1,17 @@
+[Unit]
+Description=minion robot client
+
+[Service]
+ExecStart=/usr/local/node/bin/node /home/pi/minion-client/index.js --create
+Restart=always
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=minion
+EnvironmentFile=/home/pi/minion-client/environment-variables
+User=minion
+Group=minion
+
+[Install]
+WantedBy=multi-user.target
+

@@ -13,7 +13,6 @@ const rabbit = require('./config/rabbit')
 const secrets = require('./config/secrets')
 const robotCFG = require('./config/robot')
 const RobotWorker = require('./lib/robot-worker')
-const RobotSerialInterface = require('robot-serial-iface').RobotSerialInterface
 const program = require('commander')
 const winston = require('winston')
 
@@ -24,6 +23,7 @@ program
   .option('-a,--arduino', 'Arduino robot')
   .option('-c,--create', 'iRobot Create Robot')
   .option('-r,--robot', 'The real robot')
+  .option('-t,--test', 'A test client to talk to the server')
   .option('-b,--baudrate [rate]', `Baud rate [${robotCFG.baudrate}]`, robotCFG.baudrate)
   .option('-s,--serialport [port]', `Serial port [${robotCFG.serialport}]`, robotCFG.serialport)
   .parse(process.argv)
@@ -51,9 +51,19 @@ if (!initializer) {
   process.exit(1)
 }
 
-// Start the interface...
-winston.log('debug', 'Starting the robot serial interface')
-let robot = new RobotSerialInterface()
+let robot = null
+
+if (!program.test) {
+  // Start the interface...
+  const RobotSerialInterface = require('robot-serial-iface').RobotSerialInterface
+  winston.log('debug', 'Starting the robot serial interface')
+  robot = new RobotSerialInterface()
+} else {
+  // Start the test robot interface
+  const RobotStubInterface = require('./lib/robot_stub_interface').RobotStubInterface
+  winston.log('debug', 'Starting the robot stub interface')
+  robot = new RobotStubInterface()
+}
 
 const handleIncomingCommandsConnect = (reconnectCount = 0) => {
   return queueSVC.connect(rabbit.url, rabbit.options)
@@ -81,7 +91,7 @@ const handleIncomingCommandsConnect = (reconnectCount = 0) => {
           serialport: program.serialport,
           baudrate: program.baudrate,
           initializer: initializer })
-      if (!program.none) initializer.registerHandlers(robot, worker)
+      initializer.registerHandlers(robot, worker)
       winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
       return queueSVC.consume('listener', worker.robotName + 'Command', worker)
     })
