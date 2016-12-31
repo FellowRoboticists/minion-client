@@ -18,4 +18,5 @@ export SERVER_PUBLIC_KEY
 export LOG_LEVEL=debug
 
 # Now, go ahead and run the client
-/usr/local/node/bin/node ./index.js --robot --test
+# /usr/local/node/bin/node ./index.js --robot --test
+/usr/local/node/bin/node ./index.js --arduino 

@@ -11,6 +11,17 @@ module.exports = (function () {
     name: 'sarah',
 
     /**
+     * The default, initial velocity of the robot.
+     */
+    defaultSpeed: 70,
+
+    /**
+     * Flag indicating if robot has a SAFE command.
+     * Typically this is only true for the iRobotCreate.
+     */
+    hasSafeCommand: false,
+
+    /**
      * Here's how to find out what your serial port value
      * should be:
      *

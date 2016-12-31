@@ -24,6 +24,7 @@ program
   .option('-c,--create', 'iRobot Create Robot')
   .option('-r,--robot', 'The real robot')
   .option('-t,--test', 'A test client to talk to the server')
+  .option('-v,--velocity [velocity]', `The initial velocity of the robot [${robotCFG.defaultSpeed}]`, robotCFG.defaultSpeed)
   .option('-b,--baudrate [rate]', `Baud rate [${robotCFG.baudrate}]`, robotCFG.baudrate)
   .option('-s,--serialport [port]', `Serial port [${robotCFG.serialport}]`, robotCFG.serialport)
   .parse(process.argv)
@@ -90,7 +91,9 @@ const handleIncomingCommandsConnect = (reconnectCount = 0) => {
         robotCFG.name, key, robot, {
           serialport: program.serialport,
           baudrate: program.baudrate,
-          initializer: initializer })
+          initializer: initializer,
+          defaultSpeed: program.velocity,
+          hasSafeCommand: robotCFG.hasSafeCommand})
       initializer.registerHandlers(robot, worker)
       winston.log('info', 'Starting to listen on %sCommand', worker.robotName)
       return queueSVC.consume('listener', worker.robotName + 'Command', worker)
